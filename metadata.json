@@ -1,0 +1,6 @@
+{
+  "name": "Telegram Emote Bot",
+  "description": "A Telegram bot that interfaces with a Free Fire emote automation script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
