@@ -10,7 +10,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const EXTERNAL_API_URL = (process.env.EXTERNAL_API_URL || 'https://ob53-emote-api-jd1f.onrender.com').trim().replace(/\/$/, '');
+const EXTERNAL_API_URL = (process.env.EXTERNAL_API_URL || 'ob53-emote-api-jd1f.onrender.com/join').trim().replace(/\/$/, '');
 
 // Initialize Telegram Bot
 const botToken = process.env.TELEGRAM_BOT_TOKEN || '8961422306:AAFUCLFftcgjUmazbbPS98alxGpqU5Te6eM';
