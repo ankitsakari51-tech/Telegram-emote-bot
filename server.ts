@@ -10,15 +10,25 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const EXTERNAL_API_URL = (process.env.EXTERNAL_API_URL || 'ob53-emote-api-jd1f.onrender.com/join').trim().replace(/\/$/, '');
+const EXTERNAL_API_URL = (process.env.EXTERNAL_API_URL || 'https://ob53-emote-api-jd1f.onrender.com').trim().replace(/\/$/, '');
+const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || '';
 
 // Initialize Telegram Bot
-const botToken = process.env.TELEGRAM_BOT_TOKEN || '8961422306:AAFUCLFftcgjUmazbbPS98alxGpqU5Te6eM';
-if (!botToken || botToken === 'YOUR_TELEGRAM_BOT_TOKEN_HERE') {
-  console.warn('TELEGRAM_BOT_TOKEN is not set. Using provided fallback.');
+const botToken = process.env.TELEGRAM_BOT_TOKEN;
+if (!botToken || botToken.trim() === "") {
+  console.error('❌ CRITICAL: TELEGRAM_BOT_TOKEN is missing!');
+  console.error('Please set TELEGRAM_BOT_TOKEN in your Environment Variables.');
+} else {
+  console.log('✅ TELEGRAM_BOT_TOKEN found.');
 }
 
-const bot = new Telegraf(botToken);
+if (!process.env.EXTERNAL_API_URL) {
+  console.warn('⚠️ EXTERNAL_API_URL is using default: https://ob53-emote-api-jd1f.onrender.com');
+} else {
+  console.log(`✅ EXTERNAL_API_URL set to: ${EXTERNAL_API_URL}`);
+}
+
+const bot = new Telegraf(botToken || 'DUMMY_TOKEN');
 
 // Serve static files from Vite build (for the frontend if any)
 const distPath = path.join(process.cwd(), 'dist');
@@ -141,7 +151,10 @@ async function callJoinApi(params: any) {
       console.log(`[API] Attempting ${strategy.method.toUpperCase()}: ${strategy.url}`);
       console.log(`[API] Params:`, JSON.stringify(finalParams));
       
-      const config = { timeout: 12000 };
+      const config = { 
+        timeout: 12000,
+        headers: EXTERNAL_API_KEY ? { 'Authorization': `Bearer ${EXTERNAL_API_KEY}` } : {}
+      };
       const response = strategy.method === 'get' 
         ? await axios.get(strategy.url, { ...config, params: finalParams })
         : await axios.post(strategy.url, finalParams, config);
@@ -192,9 +205,9 @@ async function handleCommand(commandText: string): Promise<string> {
 
 bot.on('text', (ctx) => {
   const text = ctx.message.text;
-  if (text.startsWith('/')) {
-    console.log(`[Bot] Received unknown command: ${text}`);
-    // No response for unknown commands to avoid junk
+  if (!text.startsWith('/')) {
+    // If user sends normal text, reply with help and button
+    return ctx.reply('⚠️ Use commands to interact with me!', helpKeyboard);
   }
 });
 
@@ -205,7 +218,7 @@ async function main() {
   console.log('--- Server Startup ---');
   
   try {
-    if (botToken && botToken !== 'YOUR_TELEGRAM_BOT_TOKEN_HERE') {
+    if (botToken && botToken.trim() !== "") {
       console.log('Launching bot...');
       bot.launch()
         .then(() => console.log('✅ Bot launched successfully'))
