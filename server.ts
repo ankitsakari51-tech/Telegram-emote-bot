@@ -15,9 +15,13 @@ const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || '';
 
 // Initialize Telegram Bot
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
+const disableBot = process.env.DISABLE_LOCAL_BOT === 'true';
+
 if (!botToken || botToken.trim() === "") {
   console.error('❌ CRITICAL: TELEGRAM_BOT_TOKEN is missing!');
   console.error('Please set TELEGRAM_BOT_TOKEN in your Environment Variables.');
+} else if (disableBot) {
+  console.log('ℹ️ Bot is manually DISABLED via DISABLE_LOCAL_BOT environment variable.');
 } else {
   console.log('✅ TELEGRAM_BOT_TOKEN found.');
 }
@@ -203,13 +207,7 @@ async function handleCommand(commandText: string): Promise<string> {
   return '❌ Unknown command';
 }
 
-bot.on('text', (ctx) => {
-  const text = ctx.message.text;
-  if (!text.startsWith('/')) {
-    // If user sends normal text, reply with help and button
-    return ctx.reply('⚠️ Use commands to interact with me!', helpKeyboard);
-  }
-});
+// No default response for non-command text to keep the bot quiet as per user request
 
 // Routes for the web app (dashboard) are now handled inside main() to ensure correct order
 
@@ -218,14 +216,21 @@ async function main() {
   console.log('--- Server Startup ---');
   
   try {
-    if (botToken && botToken.trim() !== "") {
+    if (botToken && botToken.trim() !== "" && !disableBot) {
       console.log('Launching bot...');
       bot.launch()
         .then(() => console.log('✅ Bot launched successfully'))
         .catch((err) => {
-          console.error('❌ Bot failed to launch:', err.message);
-          // Don't kill the server if only the bot fails
+          if (err.message.includes('409: Conflict')) {
+            console.error('❌ Bot Conflict: Another instance is already running with this token.');
+            console.error('   If you have deployed this code to Render, please stop the bot here in AI Studio.');
+            console.error('   You can set DISABLE_LOCAL_BOT=true in AI Studio settings to hide this error.');
+          } else {
+            console.error('❌ Bot failed to launch:', err.message);
+          }
         });
+    } else if (disableBot) {
+      console.log('ℹ️ Bot launch skipped (DISABLED).');
     } else {
       console.log('⚠️ No valid TELEGRAM_BOT_TOKEN found, bot will not be active.');
     }
@@ -241,15 +246,20 @@ async function main() {
     let externalStatus = 'Unknown';
     try {
       const start = Date.now();
-      await axios.get(EXTERNAL_API_URL, { timeout: 2000 });
+      // Increase timeout for Render cold starts
+      await axios.get(EXTERNAL_API_URL, { timeout: 5000 });
       externalStatus = `Online (${Date.now() - start}ms)`;
     } catch (err: any) {
-      externalStatus = err.response ? `Error ${err.response.status}` : 'Offline/Timeout';
+      if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        externalStatus = 'Waking Up/Busy';
+      } else {
+        externalStatus = err.response ? `Error ${err.response.status}` : 'Offline';
+      }
     }
 
     res.json({ 
       status: 'ok', 
-      botRunning: !!botToken && botToken !== 'YOUR_TELEGRAM_BOT_TOKEN_HERE',
+      botRunning: !!botToken && botToken.trim() !== "",
       externalApi: EXTERNAL_API_URL,
       externalStatus
     });
